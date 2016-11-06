@@ -19,16 +19,19 @@ import numpy as NP
 import numpy.random as NPR
 
 cimport numpy as NP
-DTYPE = NP.int
-ctypedef NP.int_t DTYPE_t
-FTYPE = NP.float
-ctypedef NP.float_t FTYPE_t
+DTYPE = NP.int64
+ctypedef NP.int64_t DTYPE_t
+FTYPE = NP.float64
+ctypedef NP.float64_t FTYPE_t
 
 import FastLDA as FLDA
 
 # We're only drawing P values from this interval,
 # so does not need to be that large...
 RANDSEED_MAX = 100000
+
+
+
 
 def getZ(pindices,allconn,finalz):
     """
@@ -39,11 +42,11 @@ def getZ(pindices,allconn,finalz):
     for (pidx,myconn) in zip(pindices,allconn):
         finalz[pidx] = NP.loads(myconn.recv())
 
-def trainsetPerplexity(NP.ndarray[NP.int_t, ndim=1] w,
-                       NP.ndarray[NP.int_t, ndim=1] d,
-                       NP.ndarray[NP.int_t, ndim=1] z,
-                       NP.ndarray[NP.float_t, ndim=2] alpha,
-                       NP.ndarray[NP.float_t, ndim=2] beta):
+def trainsetPerplexity(NP.ndarray[NP.int64_t, ndim=1] w,
+                       NP.ndarray[NP.int64_t, ndim=1] d,
+                       NP.ndarray[NP.int64_t, ndim=1] z,
+                       NP.ndarray[NP.float64_t, ndim=2] alpha,
+                       NP.ndarray[NP.float64_t, ndim=2] beta):
     """
     Calculate in-sample per-word perplexity, useful for:
     -validate parallel versus sequential sampler
@@ -55,23 +58,23 @@ def trainsetPerplexity(NP.ndarray[NP.int_t, ndim=1] w,
     cdef int T = beta.shape[0]
     cdef int W = beta.shape[1]   
     # Get counts    
-    cdef NP.ndarray[NP.int_t, ndim=2] nw, nd
-    (nw,nd) = [NP.array(val,dtype=NP.int) for val in
+    cdef NP.ndarray[NP.int64_t, ndim=2] nw, nd
+    (nw,nd) = [NP.array(val,dtype=NP.int64) for val in
                FLDA.countMatrices(w,W,d,D,z,T)]
     # Est phi/ theta
-    cdef NP.ndarray[NP.float_t, ndim=2] phi, theta
+    cdef NP.ndarray[NP.float64_t, ndim=2] phi, theta
     (phi,theta) = FLDA.estPhiTheta(nw,nd,alpha,beta)
     # Calc perplexity
     return FLDA.perplexity(w,d,phi,theta);
 
     
-def infer(NP.ndarray[NP.int_t, ndim=1] w,
-          NP.ndarray[NP.int_t, ndim=1] d,
-          NP.ndarray[NP.float_t, ndim=2] alpha,
-          NP.ndarray[NP.float_t, ndim=2] beta,
+def infer(NP.ndarray[NP.int64_t, ndim=1] w,
+          NP.ndarray[NP.int64_t, ndim=1] d,
+          NP.ndarray[NP.float64_t, ndim=2] alpha,
+          NP.ndarray[NP.float64_t, ndim=2] beta,
           int numsamp, int randseed,
           int P=1,
-          NP.ndarray[NP.int_t, ndim=1] zinit = None,
+          NP.ndarray[NP.int64_t, ndim=1] zinit = None,
           reportname = None, reportinterval = None,
           zlabels = None):
     """
@@ -92,15 +95,15 @@ def infer(NP.ndarray[NP.int_t, ndim=1] w,
     cdef int T = beta.shape[0]
     cdef int N = w.shape[0]
     # Build up online initialization
-    cdef NP.ndarray[NP.int_t, ndim=1] z
+    cdef NP.ndarray[NP.int64_t, ndim=1] z
     if(zinit == None):
         print 'Online z initialization'
-        z = NP.array(FLDA.onlineInit(w,d,alpha,beta,randseed),dtype=NP.int)
+        z = NP.array(FLDA.onlineInit(w,d,alpha,beta,randseed),dtype=NP.int64)
     else:
         z = zinit.copy()
     # Randomly partition the documents
     print 'Assigning documents to partitions'
-    cdef NP.ndarray[NP.int_t, ndim=1] docassign = NPR.randint(0,P,(D,))
+    cdef NP.ndarray[NP.int64_t, ndim=1] docassign = NPR.randint(0,P,(D,), dtype='int64')
     partdocs = []
     cdef int p
     for p in range(P):
@@ -109,8 +112,8 @@ def infer(NP.ndarray[NP.int_t, ndim=1] w,
     # Get indices associated with each partition
     # (for each idx (< N) put a 1 in the col for the partition (< P))
     print 'Getting indices associated with each partition'
-    cdef NP.ndarray[NP.int_t, ndim=2] idxpart
-    idxpart = NP.zeros((N,P),dtype=NP.int) # N x P binary matrix
+    cdef NP.ndarray[NP.int64_t, ndim=2] idxpart
+    idxpart = NP.zeros((N,P),dtype=NP.int64) # N x P binary matrix
     cdef int i
     for i in range(N):
         idxpart[i,docassign[d[i]]] = 1 # Index i --> partition p
@@ -119,14 +122,14 @@ def infer(NP.ndarray[NP.int_t, ndim=1] w,
         pindices.append(idxpart[:,p].nonzero()[0])
     # WITHIN each partition we need to renumber documents 0,...,Dp-1
     print 'Create re-numbered doc vectors for each partition'
-    cdef NP.ndarray[NP.int_t, ndim=1] pidx    
+    cdef NP.ndarray[NP.int64_t, ndim=1] pidx    
     renumdocs = []
     for pidx in pindices:
         renumdocs.append(d[pidx])
     cdef int doci, doc
     # Temporary doc map for re-mapping indices
-    cdef NP.ndarray[NP.int_t, ndim=1] tmpdocmap
-    tmpdocmap = NP.zeros((D,),dtype=NP.int)
+    cdef NP.ndarray[NP.int64_t, ndim=1] tmpdocmap
+    tmpdocmap = NP.zeros((D,),dtype=NP.int64)
     # rdocs = vector of doc values for this partition
     # pdocs = doc indices assigned to this partition
     for (pdocs,rdocs) in zip(partdocs,renumdocs):
@@ -138,7 +141,7 @@ def infer(NP.ndarray[NP.int_t, ndim=1] w,
             rdocs[doci] = tmpdocmap[rdocs[doci]]           
     # Initialize local count matrices
     print 'Initializing count matrices'
-    (localnws,localnds) = zip(*[[NP.array(val,dtype=NP.int)
+    (localnws,localnds) = zip(*[[NP.array(val,dtype=NP.int64)
                                  for val in
                                  FLDA.countMatrices(w[pidx],W,rd,rd.max()+1,
                                                   z[pidx],T)]
@@ -158,7 +161,7 @@ def infer(NP.ndarray[NP.int_t, ndim=1] w,
         # Sampler processes will be incrementing randseed btwn FLDA calls,
         # therefore we DO NOT want to assign Samplers sequential randseeds
         # (because subsequent calls to Samplers would "overlap")
-        srandseed = NPR.randint(0, RANDSEED_MAX)
+        srandseed = NPR.randint(0, RANDSEED_MAX, dtype='int64')
         # Do we have z-labels?
         if(zlabels != None):
             curzl = [zlabels[i] for i in pidx]
@@ -171,12 +174,12 @@ def infer(NP.ndarray[NP.int_t, ndim=1] w,
         allsamp[-1].start()
     # Init globalnw
     print 'Computing global nw count matrix'
-    cdef NP.ndarray[NP.int_t, ndim=2] globalnw = NP.zeros((W,T),dtype=NP.int)
+    cdef NP.ndarray[NP.int64_t, ndim=2] globalnw = NP.zeros((W,T),dtype=NP.int64)
     for localnw in localnws:
         globalnw += localnw
     # Do samples
-    cdef NP.ndarray[NP.int_t, ndim=1] finalz
-    finalz = NP.zeros((w.shape[0],),dtype=NP.int)
+    cdef NP.ndarray[NP.int64_t, ndim=1] finalz
+    finalz = NP.zeros((w.shape[0],),dtype=NP.int64)
     cdef int si
     perplex = []
     for si in range(numsamp):
@@ -187,7 +190,7 @@ def infer(NP.ndarray[NP.int_t, ndim=1] w,
         # Collect results
         localnws = [NP.loads(myconn.recv()) for myconn in allconn]
         # Re-calculate globalnw
-        globalnw = NP.zeros(localnws[0].shape,dtype=NP.int)
+        globalnw = NP.zeros(localnws[0].shape,dtype=NP.int64)
         for localnw in localnws:
             globalnw += localnw                             
         # If perplex_interval != None, record trainset perplexity
