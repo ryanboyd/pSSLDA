@@ -58,8 +58,8 @@ for di in range(D):
 
 # Python Lists must be converted to NumPy arrays
 #
-(w, d) = (NP.array(wordvec, dtype = NP.int),
-          NP.array(docvec, dtype = NP.int))
+(w, d) = (NP.array(wordvec, dtype = NP.int64),
+          NP.array(docvec, dtype = NP.int64))
 
 # Create parameters
 alpha = NP.ones((1,T)) * 1
@@ -101,10 +101,10 @@ pdb.set_trace()
 #
 labelweight = 5.0
 
-label0 = NP.zeros((T,), dtype=NP.float)
+label0 = NP.zeros((T,), dtype=NP.float64)
 label0[0] = labelweight
 
-label1 = NP.zeros((T,), dtype=NP.float)
+label1 = NP.zeros((T,), dtype=NP.float64)
 label1[1] = labelweight
 
 zlabels = []
